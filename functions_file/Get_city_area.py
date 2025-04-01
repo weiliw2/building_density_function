@@ -29,8 +29,8 @@ def geographic_to_pixel(lat, lon, transform):
     return int(col), int(row)
 
 # Main parameters
-city_center = (36.000904822474304, -78.94468675402734)
-x_km, y_km = 5, 5
+city_center = (52.5200, 13.4050)
+x_km, y_km = 10, 10
 bounding_box = calculate_bounding_box(city_center, x_km, y_km)
 
 print("Bounding Box Coordinates:", bounding_box)
@@ -62,7 +62,7 @@ con.execute("""
 SET azure_storage_connection_string = 'DefaultEndpointsProtocol=https;AccountName=overturemapswestus2;AccountKey=;EndpointSuffix=core.windows.net';
 """)
 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-output_path = f"/Users/weilynnw/Desktop/GHSL:overtrue/intrested_area_{timestamp}.geojson"
+output_path = f"/Users/weilynnw/Desktop/building_density_error/intrested_area/Berlin.geojson"
 
 query = f"""
 COPY(

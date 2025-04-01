@@ -4,11 +4,11 @@ from shapely.geometry import box
 from rasterio.transform import from_bounds
 
 
-geojson_path = "/Users/weilynnw/Desktop/GHSL:overtrue/intrested_area_20250302_000315.geojson"
+geojson_path = "/Users/weilynnw/Desktop/building_density_error/intrested_area/Berlin.geojson"
 buildings = gpd.read_file(geojson_path)
 
 # Load raster metadata
-raster_path = "/Users/weilynnw/Desktop/GHSL:overtrue/proceesed_data/cuttingGHSL/result.tif"
+raster_path = "/Users/weilynnw/Desktop/building_density_error/proceesed_data/cuttingGHSL/result.tif"
 with rasterio.open(raster_path) as src:
     raster_transform = src.transform
     raster_crs = src.crs
@@ -44,10 +44,11 @@ split_buildings = split_buildings.sjoin(grid_gdf[["grid_id", "geometry"]], how="
 split_buildings["original_building_id"] = split_buildings.index  # Retain original ID
 
 # Step 5: Save and Verify
-split_buildings.to_file("split_buildings.geojson", driver="GeoJSON")
+split_buildings.to_file("/Users/weilynnw/Desktop/building_density_error/split_building/Berilin.geojson", driver="GeoJSON")
 print(f"Saved split polygons to 'split_buildings.geojson'")
 
 # Step 6: Visualize
+"""
 import matplotlib.pyplot as plt
 
 fig, ax = plt.subplots(figsize=(10, 10))
@@ -56,3 +57,4 @@ split_buildings.plot(ax=ax, color="red", alpha=0.5)
 
 plt.title("Split Buildings Overlay on Grid")
 plt.show()
+"""

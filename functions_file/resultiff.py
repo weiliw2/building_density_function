@@ -6,8 +6,8 @@ from Get_city_area import bounding_box_pixels
 min_col, min_row, max_col, max_row = bounding_box_pixels
 print(f"Imported Bounding Box Pixels: ({min_col}, {min_row}) to ({max_col}, {max_row})")
 
-input_raster = "/Users/weilynnw/Desktop/GHSL:overtrue/proceesed_data/cuttingGHSL/GHS_BUILT_S_E2020_GLOBE_R2023A_4326_30ss_V1_0.tif"  # Replace with the local whole_global_30ssGHSL.tiff file path
-output_raster = "/Users/weilynnw/Desktop/GHSL:overtrue/proceesed_data/cuttingGHSL/result.tif"  # Replace with the desired output file path
+input_raster = "/Users/weilynnw/Desktop/building_density_error/proceesed_data/cuttingGHSL/GHS_BUILT_S_E2020_GLOBE_R2023A_4326_30ss_V1_0.tif"  # Replace with the local whole_global_30ssGHSL.tiff file path
+output_raster = "/Users/weilynnw/Desktop/building_density_error/proceesed_data/cuttingGHSL/result.tif"  # Replace with the desired output file path
 
 with rasterio.open(input_raster) as src:
     # Define the window based on pixel coordinates

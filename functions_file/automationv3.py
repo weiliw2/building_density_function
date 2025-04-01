@@ -5,11 +5,11 @@ import numpy as np
 import pandas as pd
 from pyproj import Geod
 
-geojson_path = "/Users/weilynnw/Desktop/GHSL:overtrue/proceesed_data/split_buildings.geojson"
+geojson_path = "/Users/weilynnw/Desktop/building_density_error/split_building/Berilin.geojson"
 buildings = gpd.read_file(geojson_path)
 print(f"Processing {len(buildings)} buildings in the input file")
 
-raster_path = "/Users/weilynnw/Desktop/GHSL:overtrue/proceesed_data/cuttingGHSL/result.tif"
+raster_path = "/Users/weilynnw/Desktop/building_density_error/proceesed_data/cuttingGHSL/result.tif"
 
 geod = Geod(ellps="WGS84")
 buildings["geodesic_area_m2"] = buildings.geometry.apply(lambda geom: abs(geod.geometry_area_perimeter(geom)[0]))
@@ -45,16 +45,54 @@ with rasterio.open(raster_path) as src:
 
 df_building = pd.DataFrame(building_raster)
 print(df_building)
-#
-# Compute error rate per grid cell
-error_rate = np.where(building_raster != 0, (ghsl_array - building_raster) / building_raster, np.nan)
+
+# Modified error calculation to handle all cases
+error_rate = np.where(
+    (ghsl_array == 0) & (building_raster == 0),  # Case 1: Both zero
+    0,  # No error
+    np.where(
+        (ghsl_array > 0) & (building_raster == 0),  # Case 2: GHSL > 0, buildings = 0
+        1,  # 100% error
+        np.where(
+            (ghsl_array == 0) & (building_raster > 0),  # Case 3: GHSL = 0, buildings > 0
+            -1,  # -100% error (complete underestimation)
+            (ghsl_array - building_raster) / building_raster  # Normal case
+        )
+    )
+)
 
 print("Computed GHSL Error Rates per Grid Cell!")
 
 print(error_rate)
-valid_cells = ~np.isnan(error_rate)  # Mask out NaN values
+valid_cells = ~np.isnan(error_rate)
 mean_absolute_error = np.nanmean(np.abs(error_rate[valid_cells]))  # Mean absolute error
-mean_error = np.nanmean(error_rate[valid_cells])  # Mean bias
 
 print(f"Mean Absolute Error (MAE): {mean_absolute_error:.4f}")
-print(f"Mean Error (Bias): {mean_error:.4f}")
+
+rmse = np.sqrt(np.nanmean(error_rate[valid_cells] ** 2))
+
+print(f"Root Mean Square Error (RMSE): {rmse:.4f}")
+
+rows, cols = error_rate.shape
+
+for row in range(rows):
+    for col in range(cols):
+        print(f"Cell ({row}, {col}): GHSL={ghsl_array[row, col]}, Buildings={building_raster[row, col]}, Error Rate={error_rate[row, col]:.4f}")
+
+import pickle
+
+results = {
+    'error_rate': error_rate,
+    'building_raster': building_raster,
+    'ghsl_array': ghsl_array,
+    'mean_absolute_error': mean_absolute_error,
+    'rmse': rmse,
+    'transform': raster_transform,
+    'metadata': raster_meta
+}
+
+# Save the results
+with open('building_error_results.pkl', 'wb') as f:
+    pickle.dump(results, f)
+
+print("Results saved to building_error_results.pkl")

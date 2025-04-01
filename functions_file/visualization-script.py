@@ -6,17 +6,13 @@ import pandas as pd
 with open('building_error_results.pkl', 'rb') as f:
     results = pickle.load(f)
 
-# Extract variables
 error_rate = results['error_rate']
 building_raster = results['building_raster']
 ghsl_array = results['ghsl_array']
 mean_absolute_error = results['mean_absolute_error']
 rmse = results['rmse']
 
-# Filter out NaN values for visualization
 error_values = error_rate[~np.isnan(error_rate)].flatten()
-
-# Create figure with two subplots
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
 
 # 1. Histogram of percentage error
@@ -28,18 +24,15 @@ ax1.axvline(x=0, color='r', linestyle='--', label='Zero Error')
 ax1.grid(True, alpha=0.3)
 ax1.legend()
 
-# Add stats to histogram
 stats_text = f'Mean Absolute Error: {mean_absolute_error:.4f}\nRMSE: {rmse:.4f}'
 ax1.text(0.05, 0.95, stats_text, transform=ax1.transAxes, 
          verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.5))
 
 # 2. Scatter plot of building area vs. error rate
-# Create mask for valid data points
 mask = ~np.isnan(error_rate)
 building_values = building_raster[mask].flatten()
 error_values_masked = error_rate[mask].flatten()
 
-# If there are too many points, sample them
 max_points = 5000
 if len(building_values) > max_points:
     sample_indices = np.random.choice(len(building_values), max_points, replace=False)
@@ -81,7 +74,6 @@ print(f"75th Percentile: {np.percentile(error_values, 75):.4f}")
 print(f"\nCorrelation between Building Area and Error Rate: {correlation:.4f}")
 
 # Additional analysis: Group by building area ranges and analyze error rates
-# Create bins for building areas
 area_bins = np.linspace(np.min(building_values), np.max(building_values), 10)
 area_labels = [f"{area_bins[i]:.1f}-{area_bins[i+1]:.1f}" for i in range(len(area_bins)-1)]
 
