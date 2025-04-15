@@ -6,17 +6,58 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from pyproj import Geod
 import pickle
+import os
+import csv
 
-def process_data(geojson_path, raster_path):
+# Dictionary of cities organized by continent
+# This can be expanded with more cities as needed
+CITY_METADATA = {
+    "Europe": ["Moscow", "Berlin", "Paris", "London", "Rome", "Madrid", "Prague", "Vienna", "Amsterdam", "Athens"],
+    "Asia": ["Tokyo", "Beijing", "Shanghai", "Singapore", "Seoul", "Bangkok", "Mumbai", "Delhi", "Hong Kong", "Taipei"],
+    "North America": ["New York", "Los Angeles", "Chicago", "Toronto", "Mexico City", "Seattle", "Boston", "San Francisco", "Montreal", "Vancouver"],
+    "South America": ["Sao Paulo", "Buenos Aires", "Rio de Janeiro", "Lima", "Bogota", "Santiago", "Caracas", "Quito", "Montevideo", "La Paz"],
+    "Africa": ["Cairo", "Lagos", "Johannesburg", "Nairobi", "Casablanca", "Cape Town", "Accra", "Tunis", "Addis Ababa", "Dakar"],
+    "Oceania": ["Sydney", "Melbourne", "Auckland", "Wellington", "Brisbane", "Perth", "Adelaide", "Christchurch", "Canberra", "Honolulu"]
+}
+
+# Function to get city continent
+def get_city_metadata(city_name):
+    """Get continent for a city"""
+    # Clean up city name to handle variations (remove underscores, lowercase, etc.)
+    clean_name = city_name.replace("_", " ").strip().lower()
+    
+    # Try matching with our dictionary
+    for continent, cities in CITY_METADATA.items():
+        for city in cities:
+            if (clean_name == city.lower() or 
+                clean_name in city.lower() or 
+                city.lower() in clean_name):
+                return {"continent": continent}
+    
+    # Default values if city is not found
+    print(f"Warning: City '{city_name}' not found in metadata. Using default values.")
+    return {"continent": "Unknown"}
+
+def process_data(geojson_path, raster_path, results_csv_path=None, city_center=None):
     """Process geojson and raster data to calculate error rates"""
     # Extract city name from the geojson path
-    import os
-    # Handle file path variations (case insensitive and handle potential typos)
-    city_name = os.path.basename(geojson_path).split('.')[0]
+    city_name = os.path.basename(geojson_path).split('_')[0]  # Get first part of filename as city name
     print(f"City: {city_name}")
     print(f"Loading buildings from {geojson_path}")
     buildings = gpd.read_file(geojson_path)
     print(f"Processing {len(buildings)} buildings in the input file")
+    
+    # Get city metadata
+    metadata = get_city_metadata(city_name)
+    continent = metadata["continent"]
+    
+    # Use provided coordinates
+    if city_center:
+        coordinates = city_center
+        print(f"Using provided coordinates: {coordinates}")
+    else:
+        coordinates = (0, 0)
+        print("No coordinates provided, using (0, 0)")
     
     # Calculate geodesic area for each building
     geod = Geod(ellps="WGS84")
@@ -84,29 +125,57 @@ def process_data(geojson_path, raster_path):
     for row in range(rows):
         for col in range(cols):
             cell_data.append({
+                'City': city_name,
+                'Continent': continent,
+                'Latitude': coordinates[0],
+                'Longitude': coordinates[1],
                 'Row': row,
                 'Column': col,
                 'GHSL': ghsl_array[row, col],
                 'Buildings': building_raster[row, col],
-                'Error_Rate': error_rate[row, col]
+                'Error_Rate': error_rate[row, col],
+                'MAE': mean_absolute_error,
+                'RMSE': rmse
             })
-            print(f"Cell ({row}, {col}): GHSL={ghsl_array[row, col]}, Buildings={building_raster[row, col]}, Error Rate={error_rate[row, col]:.4f}")
     
     # Save cell data to CSV with city name
     cell_df = pd.DataFrame(cell_data)
     
-    # Extract city name from the geojson path
-    import os
-    city_name = os.path.basename(geojson_path).split('.')[0]
-    
-    # Create filenames with city name
-    cell_csv_file = f'{city_name}_cell_by_cell_data.csv'
+    # Create individual city results filename
+    cell_csv_file = f'{city_name}_cell_data.csv'
     cell_df.to_csv(cell_csv_file, index=False)
     print(f"Cell-by-cell data saved to {cell_csv_file}")
+    
+    # Save to the combined results CSV if provided
+    if results_csv_path:
+        # Create a summary row with city statistics
+        summary_data = {
+            'City': city_name,
+            'Continent': continent,
+            'Latitude': coordinates[0],
+            'Longitude': coordinates[1],
+            'MAE': mean_absolute_error,
+            'RMSE': rmse,
+            'Total_Cells': len(cell_data),
+            'Valid_Cells': np.sum(valid_cells)
+        }
+        
+        # Check if the file exists to determine if we need to write headers
+        file_exists = os.path.isfile(results_csv_path)
+        
+        with open(results_csv_path, 'a', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=summary_data.keys())
+            if not file_exists:
+                writer.writeheader()
+            writer.writerow(summary_data)
+        
+        print(f"Summary data appended to {results_csv_path}")
     
     # Prepare results dictionary
     results = {
         'city_name': city_name,
+        'continent': continent,
+        'coordinates': coordinates,
         'error_rate': error_rate,
         'building_raster': building_raster,
         'ghsl_array': ghsl_array,
@@ -132,6 +201,12 @@ def visualize_results(results, city_name):
     ghsl_array = results['ghsl_array']
     mean_absolute_error = results['mean_absolute_error']
     rmse = results['rmse']
+    continent = results.get('continent', 'Unknown')
+    coordinates = results.get('coordinates', (0, 0))
+    
+    # Add metadata to the plot title
+    plot_title = f'Building Error Analysis for {city_name}\n'
+    plot_title += f'Continent: {continent}, Coordinates: {coordinates}'
     
     error_values = error_rate[~np.isnan(error_rate)].flatten()
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
@@ -178,12 +253,15 @@ def visualize_results(results, city_name):
              verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.5))
     
     plt.tight_layout()
-    fig.suptitle(f'Building Error Analysis for {city_name}', fontsize=16, y=1.05)
+    fig.suptitle(plot_title, fontsize=16, y=1.05)
     plt.savefig(f'{city_name}_error_area_analysis.png', dpi=300)
     plt.show()
     
     # Print summary statistics
     print("\nError Distribution Statistics:")
+    print(f"City: {city_name}")
+    print(f"Continent: {continent}")
+    print(f"Coordinates: {coordinates}")
     print(f"Mean Error: {np.mean(error_values):.4f}")
     print(f"Median Error: {np.median(error_values):.4f}")
     print(f"Mean Absolute Error: {mean_absolute_error:.4f}")
@@ -210,6 +288,10 @@ def visualize_results(results, city_name):
         if np.any(mask):
             errors_in_bin = error_values_masked[mask]
             bin_stats.append({
+                'City': city_name,
+                'Continent': continent,
+                'Latitude': coordinates[0],
+                'Longitude': coordinates[1],
                 'Area Range': area_labels[i],
                 'Count': len(errors_in_bin),
                 'Mean Error': np.mean(errors_in_bin),
@@ -221,44 +303,85 @@ def visualize_results(results, city_name):
     bin_df = pd.DataFrame(bin_stats)
     print("\nError Statistics by Building Area Range:")
     print(bin_df)
+    
+    # No longer saving bin statistics to CSV
+    print("Bin statistics calculated but not saved to CSV")
 
 def main():
-    """Main function to run both processing and visualization"""
-    import os
-    
+    """Main function to run processing and visualization for a single city"""
     # Define file paths
-    # For the GeoJSON, prompt for the city file since this will change
     geojson_path = input("Enter the path to the GeoJSON file for the city: ")
     if not geojson_path:
         print("Error: You must provide a path to the GeoJSON file.")
         return
         
-    # The raster path is fixed and doesn't change
     raster_path = input("Enter the path to the Raster file for the city: ")
     if not raster_path:
         print("Error: You must provide a path to the Raster file.")
         return
     
-    # Extract city name for better prompting
-    city_name = os.path.basename(geojson_path).split('.')[0]
+    # Extract city name from the geojson path
+    city_name = os.path.basename(geojson_path).split('_')[0]
+    
+    # Get coordinates from combined_script.py input
+    try:
+        lat = float(input(f"Enter latitude for {city_name} from combined_script.py: "))
+        lon = float(input(f"Enter longitude for {city_name} from combined_script.py: "))
+        city_center = (lat, lon)
+    except ValueError:
+        print("Invalid coordinates. Using (0,0) as default.")
+        city_center = (0, 0)
+    
+    # Define the path for the combined results CSV (optional)
+    combined_results_csv = input("Enter the path for the combined results CSV (or press Enter to skip): ")
+    if not combined_results_csv:
+        combined_results_csv = None
     
     # Option to load existing results instead of reprocessing data
     load_existing = input(f"Load existing results from {city_name}_building_error_results.pkl if available? (y/n): ").lower() == 'y'
     
     if load_existing:
-        city_name = os.path.basename(geojson_path).split('.')[0]
         pkl_file = f'{city_name}_building_error_results.pkl'
         try:
             with open(pkl_file, 'rb') as f:
                 results = pickle.load(f)
             print(f"Loaded existing results from {pkl_file}")
+            
+            # If we loaded from pickle but need to save to combined results
+            if combined_results_csv:
+                # Create a summary row with city statistics
+                metadata = get_city_metadata(results.get('city_name', city_name))
+                continent = results.get('continent', metadata.get('continent', 'Unknown'))
+                coordinates = results.get('coordinates', city_center)
+                
+                summary_data = {
+                    'City': results.get('city_name', city_name),
+                    'Continent': continent,
+                    'Latitude': coordinates[0],
+                    'Longitude': coordinates[1],
+                    'MAE': results.get('mean_absolute_error', 0),
+                    'RMSE': results.get('rmse', 0),
+                    'Total_Cells': np.size(results.get('error_rate', np.array([]))),
+                    'Valid_Cells': np.sum(~np.isnan(results.get('error_rate', np.array([]))))
+                }
+                
+                file_exists = os.path.isfile(combined_results_csv)
+                
+                with open(combined_results_csv, 'a', newline='') as f:
+                    writer = csv.DictWriter(f, fieldnames=summary_data.keys())
+                    if not file_exists:
+                        writer.writeheader()
+                    writer.writerow(summary_data)
+                
+                print(f"Summary data appended to {combined_results_csv}")
+                
         except FileNotFoundError:
             print(f"No existing results found for {city_name}. Processing data...")
-            results = process_data(geojson_path, raster_path)
+            results = process_data(geojson_path, raster_path, combined_results_csv, city_center)
     else:
-        results = process_data(geojson_path, raster_path)
+        results = process_data(geojson_path, raster_path, combined_results_csv, city_center)
     
-    city_name = os.path.basename(geojson_path).split('.')[0] if not load_existing else results.get('city_name', 'Unknown')
+    city_name = results.get('city_name', city_name)
     
     # Visualize results with city name
     visualize_results(results, city_name)
