@@ -45,6 +45,8 @@ def aggregate_city_data(data_dir='/Users/weilynnw/Desktop/building_density_error
             ghsl_sum = round(df['GHSL'].sum())
             buildings_sum = df['Buildings'].sum()
             error_rate_avg = df['Error_Rate'].mean()
+            # Calculate median percentage error
+            median_percent_error = df['Error_Rate'].median()
             mae_avg = df['MAE'].mean()
             rmse_avg = df['RMSE'].mean()
             
@@ -57,6 +59,7 @@ def aggregate_city_data(data_dir='/Users/weilynnw/Desktop/building_density_error
                 'GHSL_Sum': ghsl_sum,
                 'Buildings_Sum': buildings_sum,
                 'Error_Rate': error_rate_avg,
+                'Median_Percent_Error': median_percent_error,  # Added this line
                 'MAE': mae_avg,
                 'RMSE': rmse_avg
             }

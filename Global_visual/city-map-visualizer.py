@@ -52,7 +52,6 @@ def visualize_cities_on_map(csv_path, output_path=None, marker_size_column='Buil
     size_multiplier = 100 / sizes.max() if sizes.max() > 0 else 1
     marker_sizes = sizes * size_multiplier
     
-    # Normalize colors if using a data column for colors
     if color_column:
         colors = df[color_column].values
         norm = plt.Normalize(colors.min(), colors.max())
@@ -65,12 +64,10 @@ def visualize_cities_on_map(csv_path, output_path=None, marker_size_column='Buil
         cbar = plt.colorbar(scatter, shrink=0.7, label=color_column)
         cbar.ax.tick_params(labelsize=8)
     else:
-        # Use continent-based colors
         colors = [continent_colors.get(continent, 'gray') for continent in df['Continent']]
         scatter = m.scatter(x, y, s=marker_sizes, c=colors, 
                          alpha=0.7, edgecolors='black', linewidth=0.5, zorder=5)
         
-        # Add legend for continents
         for continent, color in continent_colors.items():
             if continent in df['Continent'].values:
                 plt.scatter([], [], c=color, alpha=0.7, s=50, label=continent)
@@ -91,15 +88,13 @@ def visualize_cities_on_map(csv_path, output_path=None, marker_size_column='Buil
     # Add note about marker size
     plt.figtext(0.02, 0.02, f"Marker size based on {marker_size_column}", fontsize=8)
     
-    # Tight layout to use space efficiently
     plt.tight_layout()
     
     # Save if output path is provided
     if output_path:
         plt.savefig(output_path, dpi=300, bbox_inches='tight')
         print(f"Map saved to {output_path}")
-    
-    # Show the map
+
     plt.show()
 
 def visualize_cities_folium(csv_path, output_path=None, marker_size_column='Buildings_Sum', 
@@ -121,7 +116,6 @@ def visualize_cities_folium(csv_path, output_path=None, marker_size_column='Buil
         print("Please install folium: pip install folium")
         return
     
-    # Read the aggregated city data
     df = pd.read_csv(csv_path)
     print(f"Loaded {len(df)} cities from {csv_path}")
     
@@ -131,12 +125,10 @@ def visualize_cities_folium(csv_path, output_path=None, marker_size_column='Buil
     city_map = folium.Map(location=[mid_lat, mid_lon], zoom_start=2, 
                          tiles='CartoDB positron')
     
-    # Create a marker cluster
     marker_cluster = MarkerCluster().add_to(city_map)
-    
-    # Normalize sizes
+
     min_size = 5  # Minimum marker radius in pixels
-    max_size = 25  # Maximum marker radius in pixels
+    max_size = 25 
     sizes = df[marker_size_column].values
     size_range = sizes.max() - sizes.min() if sizes.max() != sizes.min() else 1
     
@@ -169,6 +161,7 @@ def visualize_cities_folium(csv_path, output_path=None, marker_size_column='Buil
         Buildings: {city['Buildings_Sum']:.2f}<br>
         GHSL: {city['GHSL_Sum']}<br>
         Error Rate: {city['Error_Rate']:.4f}<br>
+        Median Percent Error:  {city['Median_Percent_Error']:.4f}<br>
         MAE: {city['MAE']:.4f}<br>
         RMSE: {city['RMSE']:.4f}
         """
@@ -214,7 +207,7 @@ def main():
             csv_path=csv_path,
             output_path=static_map_path,
             marker_size_column='Buildings_Sum',
-            color_column='Error_Rate',
+            color_column='Median_Percent_Error',
             title='Global Distribution of Cities - Building Density and Error Rates'
         )
         print(f"Static map created at {static_map_path}")
@@ -229,7 +222,7 @@ def main():
             csv_path=csv_path,
             output_path=interactive_map_path,
             marker_size_column='Buildings_Sum',
-            color_column='Error_Rate'
+            color_column='Median_Percent_Error'
         )
         print(f"Interactive map created at {interactive_map_path}")
     except Exception as e:

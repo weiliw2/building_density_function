@@ -221,8 +221,8 @@ def process_city(city_name, city_center, x_km, y_km, input_raster_path, output_d
 # Example usage
 if __name__ == "__main__":
     # Define your parameters
-    city_name = "Toronto"
-    city_center = (43.6532, -79.3832)#(latitude, longitude)
+    city_name = "Auckland"
+    city_center = (-36.8509, 174.7645)#(latitude, longitude)
     x_km, y_km = 10, 10  # 10km x 10km area
     
     # Path to input raster file
