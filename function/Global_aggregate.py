@@ -1,6 +1,7 @@
 import pandas as pd
 import glob
 import os
+import numpy as np
 
 def aggregate_city_data(data_dir='/Users/weilynnw/Desktop/building_density_error/Cell_data', file_pattern='*_cell_data.csv'):
     """
@@ -12,7 +13,7 @@ def aggregate_city_data(data_dir='/Users/weilynnw/Desktop/building_density_error
         file_pattern: Pattern matching the CSV files to process
         
     Returns:
-        DataFrame with aggregated city data
+        DataFrame with aggregated city data including MAE, RMSE, and MAPE
     """
     full_pattern = os.path.join(data_dir, file_pattern)
     
@@ -42,13 +43,25 @@ def aggregate_city_data(data_dir='/Users/weilynnw/Desktop/building_density_error
             latitude = df['Latitude'].iloc[0]
             longitude = df['Longitude'].iloc[0]
             
+            # Sum the total GHSL and Buildings values
             ghsl_sum = round(df['GHSL'].sum())
             buildings_sum = df['Buildings'].sum()
-            error_rate_avg = df['Error_Rate'].mean()
-            # Calculate median percentage error
-            median_percent_error = df['Error_Rate'].median()
-            mae_avg = df['MAE'].mean()
-            rmse_avg = df['RMSE'].mean()
+            
+            # Calculate MAE (Mean Absolute Error) from GHSL and Buildings columns
+            mae = np.mean(np.abs(df['GHSL'] - df['Buildings']))
+            
+            # Calculate RMSE (Root Mean Square Error) from GHSL and Buildings columns
+            rmse = np.sqrt(np.mean((df['GHSL'] - df['Buildings'])**2))
+            
+            # Calculate MAPE (Mean Absolute Percentage Error) from GHSL and Buildings columns
+            # mean(|GHSL - Buildings| / |Buildings|) * 100
+            # Avoid division by zero by filtering out zero values
+            non_zero_mask = df['Buildings'] != 0
+            if non_zero_mask.any():
+                mape = np.mean(np.abs((df['GHSL'][non_zero_mask] - df['Buildings'][non_zero_mask]) / df['Buildings'][non_zero_mask])) * 100
+            else:
+                mape = np.nan
+                print(f"Warning: No non-zero Buildings values in {city}, MAPE set to NaN")
             
             # Create summary row for this city
             city_summary = {
@@ -58,10 +71,9 @@ def aggregate_city_data(data_dir='/Users/weilynnw/Desktop/building_density_error
                 'Longitude': longitude,
                 'GHSL_Sum': ghsl_sum,
                 'Buildings_Sum': buildings_sum,
-                'Error_Rate': error_rate_avg,
-                'Median_Percent_Error': median_percent_error,  # Added this line
-                'MAE': mae_avg,
-                'RMSE': rmse_avg
+                'MAE': mae,
+                'RMSE': rmse,
+                'MAPE': mape
             }
             
             city_summaries.append(city_summary)
